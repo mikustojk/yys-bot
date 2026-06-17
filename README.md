@@ -2,8 +2,8 @@
 
 一个用于启动阴阳师脚本的 Windows 桌面启动器。当前启动器包含两个主要功能：
 
-- `困难28`：运行自适应尺寸版 K28 脚本 `maa_lite_k28.py`
-- `刷挑战`：运行自适应尺寸版挑战脚本 `忽略尺寸刷.py`
+- `困难28`：自动刷取困28。（注：主要用于刷绘卷，自动清结界票功能开发中）
+- `刷挑战`：所有通过点击 “挑战” 按钮开始战斗的副本均可刷取
 
 ## 环境要求
 
@@ -21,7 +21,7 @@
 .\setup_env.ps1
 ```
 
-看到 `Environment ready` 后，直接打开：
+看到 `Environment ready` 后，直接打开目录中的：
 
 ```powershell
 .\script.exe
@@ -29,7 +29,7 @@
 
 启动器会自动优先使用项目里的 `.venv` 虚拟环境。
 
-## 重新生成启动器
+### 重新生成启动器
 
 修改 `script_launcher.cs` 后运行：
 
@@ -39,7 +39,7 @@
 
 生成结果是 `script.exe`。
 
-## 自适应模板截图
+### 自适应模板截图
 
 自适应脚本使用 `images/maa` 里的模板。需要重新截图时，把模拟器停在对应界面，然后运行：
 
@@ -53,14 +53,3 @@
 - K28 脚本：`k28_stage`、`k28_explore`、`k28_battle`、`k28_boss`、`k28_paper`、`k28_treasure`、`k28_team_prompt`、`k28_team_confirm`
 
 截图工具会把模板保存到 `images/maa`。
-
-## 上传 GitHub 前建议
-
-仓库会忽略 `.venv`、`__pycache__` 和 `MaaAssistantArknights` 参考仓库。上传前建议先检查：
-
-```powershell
-git status
-```
-
-确认没有把本地虚拟环境、临时截图或无关测试文件加入提交。
-
