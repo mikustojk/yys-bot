@@ -17,7 +17,7 @@ import win32ui
 ctypes.windll.user32.SetProcessDPIAware()
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMPLATE_DIR = os.path.join(SCRIPT_DIR, "images", "maa")
+TEMPLATE_DIR = os.path.join(SCRIPT_DIR, "images", "templates")
 BASE_W = 1280
 BASE_H = 720
 
@@ -71,8 +71,7 @@ TASKS = {
 
 
 def log(message: str):
-    now = datetime.datetime.now().strftime("%H:%M:%S")
-    print(f"{now} {message}", flush=True)
+    print(message, flush=True)
 
 
 def get_run_count(prompt: str) -> int:
@@ -91,7 +90,7 @@ def read_image(path: str):
     return cv2.imdecode(data, cv2.IMREAD_COLOR)
 
 
-def maa_scale_size(width: int, height: int) -> tuple:
+def normalize_screen_size(width: int, height: int) -> tuple:
     if width <= 0 or height <= 0:
         return BASE_W, BASE_H
 
@@ -119,7 +118,6 @@ class BgEmulatorWindow:
         self.last_raw_size = None
         self.last_base_size = None
 
-        log(f"[+] 主窗口: {hex(self.hwnd)}, 渲染窗口: {hex(self.render_hwnd)}")
         self._connect_adb()
 
     def _connect_adb(self):
@@ -138,7 +136,6 @@ class BgEmulatorWindow:
             if match:
                 self.android_w = int(match.group(1))
                 self.android_h = int(match.group(2))
-                log(f"[*] Android 分辨率: {self.android_w}x{self.android_h}")
         except Exception as exc:
             log(f"[!] 获取 Android 分辨率失败: {exc}")
 
@@ -190,7 +187,7 @@ class BgEmulatorWindow:
     def screenshot_base(self):
         raw = self.screenshot_raw()
         raw_h, raw_w = raw.shape[:2]
-        base_w, base_h = maa_scale_size(raw_w, raw_h)
+        base_w, base_h = normalize_screen_size(raw_w, raw_h)
 
         self.last_raw_size = (raw_w, raw_h)
         self.last_base_size = (base_w, base_h)
@@ -216,19 +213,61 @@ class BgEmulatorWindow:
 
     def click_base(self, x: int, y: int):
         raw_w, raw_h = self.last_raw_size or self._client_size()
-        base_w, base_h = self.last_base_size or maa_scale_size(raw_w, raw_h)
+        base_w, base_h = self.last_base_size or normalize_screen_size(raw_w, raw_h)
         raw_x = int(x / base_w * raw_w)
         raw_y = int(y / base_h * raw_h)
         adb_x, adb_y = self._map_raw_to_adb(raw_x, raw_y, raw_w, raw_h)
 
+        self._human_tap_adb(adb_x, adb_y)
+
+
+    def _human_tap_adb(self, adb_x: int, adb_y: int, jitter=3, extra_tap_chance=0.06):
+        x = adb_x + random.randint(-jitter, jitter)
+        y = adb_y + random.randint(-jitter, jitter)
+        drift_x = random.randint(-1, 1)
+        drift_y = random.randint(-1, 1)
+        press_ms = random.randint(45, 135)
+        time.sleep(random.uniform(0.035, 0.16))
         subprocess.run(
-            [self.adb_exe, "-s", self.adb_address, "shell", "input", "tap", str(adb_x), str(adb_y)],
+            [
+                self.adb_exe,
+                "-s",
+                self.adb_address,
+                "shell",
+                "input",
+                "swipe",
+                str(x),
+                str(y),
+                str(x + drift_x),
+                str(y + drift_y),
+                str(press_ms),
+            ],
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
-        log(f"[debug] click base=({x},{y}) raw=({raw_x},{raw_y}) adb=({adb_x},{adb_y})")
+        if random.random() < extra_tap_chance:
+            time.sleep(random.uniform(0.055, 0.14))
+            x2 = adb_x + random.randint(-jitter, jitter)
+            y2 = adb_y + random.randint(-jitter, jitter)
+            subprocess.run(
+                [
+                    self.adb_exe,
+                    "-s",
+                    self.adb_address,
+                    "shell",
+                    "input",
+                    "swipe",
+                    str(x2),
+                    str(y2),
+                    str(x2 + random.randint(-1, 1)),
+                    str(y2 + random.randint(-1, 1)),
+                    str(random.randint(40, 110)),
+                ],
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        time.sleep(random.uniform(0.025, 0.11))
 
 
-class MaaLiteMatcher:
+class TemplateMatcher:
     def __init__(self, emu: BgEmulatorWindow):
         self.emu = emu
         self.last_screen = None
@@ -247,7 +286,7 @@ class MaaLiteMatcher:
                 missing.append(task["template"])
         if missing:
             log("[ERROR] 缺少必要模板：" + ", ".join(missing))
-            log("[ERROR] 请先运行 capture_maa_template.py 截图，具体截法见我给你的说明。")
+            log("[ERROR] 请先运行 capture_template.py 截图，具体截法见我给你的说明。")
             return False
         return True
 
@@ -270,11 +309,7 @@ class MaaLiteMatcher:
         return cv2.dilate(mask, kernel, iterations=1)
 
     def _debug_miss(self, task_name: str, score: float, scale: float):
-        now = time.time()
-        last = self.debug_times.get(task_name, 0)
-        if now - last >= 5:
-            log(f"[debug] {task_name} miss best={score:.3f} scale={scale:.2f}")
-            self.debug_times[task_name] = now
+        return
 
     def find(self, task_name: str):
         if not self.has_template(task_name):
@@ -352,19 +387,20 @@ class MaaLiteMatcher:
         x = best_loc[0] + roi_x
         y = best_loc[1] + roi_y
         w, h = best_size
-        log(f"[debug] {task_name} score={best_score:.3f} scale={best_scale:.2f} rect=({x},{y},{w},{h})")
         return x, y, w, h, best_score, task_name
 
     def click_match(self, match, wait=0.5):
         x, y, w, h, _ = match[:5]
         if len(match) >= 6 and match[5] == "settlement":
-            self.emu.click_base(x + int(w * 0.50), y + int(h * 0.55))
+            click_x = x + random.randint(int(w * 0.44), int(w * 0.56))
+            click_y = y + random.randint(int(h * 0.48), int(h * 0.64))
+            self.emu.click_base(click_x, click_y)
             time.sleep(wait)
             return
 
         if len(match) >= 6 and match[5] == "challenge":
-            click_x = x + int(w * 0.52)
-            click_y = y + int(h * 0.78)
+            click_x = x + random.randint(int(w * 0.46), int(w * 0.60))
+            click_y = y + random.randint(int(h * 0.70), int(h * 0.86))
             self.emu.click_base(click_x, click_y)
             time.sleep(wait)
             return
@@ -377,7 +413,7 @@ class MaaLiteMatcher:
         time.sleep(wait)
 
 
-def handle_optional_dialogs(bot: MaaLiteMatcher):
+def handle_optional_dialogs(bot: TemplateMatcher):
     disconnect = bot.find("disconnect")
     if disconnect:
         log("[操作] 检测到掉线弹窗")
@@ -397,20 +433,25 @@ def handle_optional_dialogs(bot: MaaLiteMatcher):
     return False
 
 
-def run_loop(bot: MaaLiteMatcher, times: int):
+def run_loop(bot: TemplateMatcher, times: int):
     completed = 0
+    last_wait_log = 0
+    log(f"刷挑战任务开始，目标次数：{times}")
     while completed < times:
-        log(f"--- 已完成 {completed}/{times}，寻找挑战按钮 ---")
         handle_optional_dialogs(bot)
 
         challenge = bot.find("challenge")
         if not challenge:
-            log("[等待] 未找到挑战按钮")
+            now = time.time()
+            if now - last_wait_log >= 10:
+                log(f"进度：{completed}/{times}，正在寻找挑战按钮")
+                last_wait_log = now
             time.sleep(1.5)
             continue
 
         bot.click_match(challenge, wait=random.uniform(1.2, 2.0))
-        log("[操作] 点击挑战按钮")
+        current = completed + 1
+        log(f"第 {current}/{times} 次：开始战斗")
 
         start = time.time()
         while time.time() - start < 240:
@@ -425,13 +466,13 @@ def run_loop(bot: MaaLiteMatcher, times: int):
                     if not settlement:
                         closed = True
                         break
-                    log(f"[debug] settlement still visible, click retry {attempt + 1}/3")
 
                 if not closed:
                     log("[WARN] 检测到结算，但点击后仍未关闭，继续等待。")
                     continue
                 completed += 1
-                log(f"--- 第 {completed}/{times} 次挑战完成 ---")
+                log(f"第 {completed}/{times} 次：结束战斗")
+                log(f"进度：{completed}/{times}")
                 break
             time.sleep(1.0)
         else:
@@ -440,9 +481,9 @@ def run_loop(bot: MaaLiteMatcher, times: int):
 
 def main():
     os.chdir(SCRIPT_DIR)
-    log("正在启动 MAA-lite 挑战脚本...")
+    log("刷挑战脚本启动")
     emu = BgEmulatorWindow()
-    bot = MaaLiteMatcher(emu)
+    bot = TemplateMatcher(emu)
     if not bot.check_required_templates():
         return
 
@@ -453,7 +494,7 @@ def main():
         return
 
     run_loop(bot, times)
-    log("任务结束。")
+    log(f"刷挑战任务结束，共完成 {times}/{times} 次")
 
 
 if __name__ == "__main__":

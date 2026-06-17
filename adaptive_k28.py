@@ -16,7 +16,7 @@ import win32ui
 ctypes.windll.user32.SetProcessDPIAware()
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMPLATE_DIR = os.path.join(SCRIPT_DIR, "images", "maa")
+TEMPLATE_DIR = os.path.join(SCRIPT_DIR, "images", "templates")
 BASE_W = 1280
 BASE_H = 720
 
@@ -88,8 +88,7 @@ class ScriptStuck(Exception):
 
 
 def log(message: str):
-    now = datetime.datetime.now().strftime("%H:%M:%S")
-    print(f"{now} {message}", flush=True)
+    print(message, flush=True)
 
 
 def get_run_count(prompt: str) -> int:
@@ -108,7 +107,7 @@ def read_image(path: str):
     return cv2.imdecode(data, cv2.IMREAD_COLOR)
 
 
-def maa_scale_size(width: int, height: int) -> tuple:
+def normalize_screen_size(width: int, height: int) -> tuple:
     if width <= 0 or height <= 0:
         return BASE_W, BASE_H
     default_ratio = BASE_W / BASE_H
@@ -134,7 +133,6 @@ class BgEmulatorWindow:
         self.android_h = 0
         self.last_raw_size = None
         self.last_base_size = None
-        log(f"[+] window={hex(self.hwnd)}, render={hex(self.render_hwnd)}")
         self._connect_adb()
 
     def _connect_adb(self):
@@ -152,7 +150,6 @@ class BgEmulatorWindow:
             if match:
                 self.android_w = int(match.group(1))
                 self.android_h = int(match.group(2))
-                log(f"[*] Android size: {self.android_w}x{self.android_h}")
         except Exception as exc:
             log(f"[WARN] failed to read Android size: {exc}")
 
@@ -201,7 +198,7 @@ class BgEmulatorWindow:
     def screenshot_base(self):
         raw = self.screenshot_raw()
         raw_h, raw_w = raw.shape[:2]
-        base_w, base_h = maa_scale_size(raw_w, raw_h)
+        base_w, base_h = normalize_screen_size(raw_w, raw_h)
         self.last_raw_size = (raw_w, raw_h)
         self.last_base_size = (base_w, base_h)
         if raw_w == base_w and raw_h == base_h:
@@ -222,17 +219,58 @@ class BgEmulatorWindow:
 
     def _base_to_raw(self, x: int, y: int):
         raw_w, raw_h = self.last_raw_size or self._client_size()
-        base_w, base_h = self.last_base_size or maa_scale_size(raw_w, raw_h)
+        base_w, base_h = self.last_base_size or normalize_screen_size(raw_w, raw_h)
         return int(x / base_w * raw_w), int(y / base_h * raw_h), raw_w, raw_h
+
+    def _human_tap_adb(self, adb_x: int, adb_y: int, jitter=3, extra_tap_chance=0.06):
+        x = adb_x + random.randint(-jitter, jitter)
+        y = adb_y + random.randint(-jitter, jitter)
+        drift_x = random.randint(-1, 1)
+        drift_y = random.randint(-1, 1)
+        press_ms = random.randint(45, 135)
+        time.sleep(random.uniform(0.035, 0.16))
+        subprocess.run(
+            [
+                self.adb_exe,
+                "-s",
+                self.adb_address,
+                "shell",
+                "input",
+                "swipe",
+                str(x),
+                str(y),
+                str(x + drift_x),
+                str(y + drift_y),
+                str(press_ms),
+            ],
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+        if random.random() < extra_tap_chance:
+            time.sleep(random.uniform(0.055, 0.14))
+            x2 = adb_x + random.randint(-jitter, jitter)
+            y2 = adb_y + random.randint(-jitter, jitter)
+            subprocess.run(
+                [
+                    self.adb_exe,
+                    "-s",
+                    self.adb_address,
+                    "shell",
+                    "input",
+                    "swipe",
+                    str(x2),
+                    str(y2),
+                    str(x2 + random.randint(-1, 1)),
+                    str(y2 + random.randint(-1, 1)),
+                    str(random.randint(40, 110)),
+                ],
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        time.sleep(random.uniform(0.025, 0.11))
 
     def click_base(self, x: int, y: int):
         raw_x, raw_y, raw_w, raw_h = self._base_to_raw(x, y)
         adb_x, adb_y = self._map_raw_to_adb(raw_x, raw_y, raw_w, raw_h)
-        subprocess.run(
-            [self.adb_exe, "-s", self.adb_address, "shell", "input", "tap", str(adb_x), str(adb_y)],
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-        log(f"[debug] click base=({x},{y}) raw=({raw_x},{raw_y}) adb=({adb_x},{adb_y})")
+        self._human_tap_adb(adb_x, adb_y)
 
     def swipe_base(self, x1: int, y1: int, x2: int, y2: int, duration: float = 0.8):
         rx1, ry1, raw_w, raw_h = self._base_to_raw(x1, y1)
@@ -255,10 +293,9 @@ class BgEmulatorWindow:
             ],
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
-        log(f"[debug] swipe base=({x1},{y1})->({x2},{y2}) adb=({ax1},{ay1})->({ax2},{ay2})")
 
 
-class MaaMatcher:
+class TemplateMatcher:
     def __init__(self, emu: BgEmulatorWindow):
         self.emu = emu
         self.debug_times = {}
@@ -282,7 +319,7 @@ class MaaMatcher:
                 missing.append(task["template"])
         if missing:
             log("[ERROR] missing templates: " + ", ".join(missing))
-            log("[ERROR] use capture_maa_template.py to capture the k28_* templates.")
+            log("[ERROR] use capture_template.py to capture the k28_* templates.")
             return False
         return True
 
@@ -298,10 +335,7 @@ class MaaMatcher:
         return x, y, w, h
 
     def _debug_miss(self, task_name: str, score: float):
-        now = time.time()
-        if now - self.debug_times.get(task_name, 0) >= 5:
-            log(f"[debug] {task_name} miss best={score:.3f}")
-            self.debug_times[task_name] = now
+        return
 
     def find(self, task_name: str):
         if not self.has_template(task_name):
@@ -348,7 +382,6 @@ class MaaMatcher:
         y = best_loc[1] + roi_y
         w = best_templ.shape[1]
         h = best_templ.shape[0]
-        log(f"[debug] {task_name} score={best_score:.3f} scale={best_scale:.2f} rect=({x},{y},{w},{h})")
         return x, y, w, h, best_score, task_name
 
     def random_point(self, match):
@@ -369,7 +402,7 @@ class MaaMatcher:
         time.sleep(wait)
 
 
-def wait_until_gone(bot: MaaMatcher, task_name: str, timeout=3.0):
+def wait_until_gone(bot: TemplateMatcher, task_name: str, timeout=3.0):
     start = time.time()
     while time.time() - start < timeout:
         if not bot.find(task_name):
@@ -378,7 +411,7 @@ def wait_until_gone(bot: MaaMatcher, task_name: str, timeout=3.0):
     return False
 
 
-def wait_and_click(bot: MaaMatcher, task_name: str, timeout=120, retries=3):
+def wait_and_click(bot: TemplateMatcher, task_name: str, timeout=120, retries=3):
     start = time.time()
     while time.time() - start < timeout:
         match = bot.find(task_name)
@@ -388,13 +421,12 @@ def wait_and_click(bot: MaaMatcher, task_name: str, timeout=120, retries=3):
                 if wait_until_gone(bot, task_name, timeout=2.0):
                     return True
                 match = bot.find(task_name) or match
-                log(f"[debug] {task_name} still visible, retry {attempt + 1}/{retries}")
             return False
         time.sleep(1.0)
     return False
 
 
-def enter_k28(bot: MaaMatcher):
+def enter_k28(bot: TemplateMatcher):
     start = time.time()
     while time.time() - start < 120:
         explore = bot.find("explore")
@@ -404,7 +436,6 @@ def enter_k28(bot: MaaMatcher):
             while time.time() - verify_start < 2.5:
                 if not bot.find("explore"):
                     time.sleep(0.5)
-                    log("[k28] entered exploration map")
                     return True
                 time.sleep(0.3)
             continue
@@ -416,7 +447,7 @@ def enter_k28(bot: MaaMatcher):
     return False
 
 
-def click_settlement_once(bot: MaaMatcher, wait=1.0) -> bool:
+def click_settlement_once(bot: TemplateMatcher, wait=1.0) -> bool:
     settlement = bot.find("settlement")
     if not settlement:
         return False
@@ -424,7 +455,7 @@ def click_settlement_once(bot: MaaMatcher, wait=1.0) -> bool:
     return True
 
 
-def wait_for_settlement_and_click(bot: MaaMatcher, timeout=120, wait=1.0) -> bool:
+def wait_for_settlement_and_click(bot: TemplateMatcher, timeout=120, wait=1.0) -> bool:
     start = time.time()
     while time.time() - start < timeout:
         if click_settlement_once(bot, wait=wait):
@@ -441,7 +472,8 @@ def swipe_map(emu: BgEmulatorWindow):
     emu.swipe_base(cx, cy, cx + dx, cy, duration=random.uniform(1.0, 1.5))
 
 
-def finish_k28_rewards(bot: MaaMatcher):
+def finish_k28_rewards(bot: TemplateMatcher):
+    log("处理奖励")
     base_w, base_h = bot.emu.last_base_size or (BASE_W, BASE_H)
     for _ in range(1, 4):
         start = time.time()
@@ -469,13 +501,16 @@ def finish_k28_rewards(bot: MaaMatcher):
         confirm = bot.find("team_confirm")
         if confirm:
             bot.click_match(confirm, wait=random.uniform(0.8, 1.2))
+    log("奖励处理完成")
 
 
-def run_k28(bot: MaaMatcher, emu: BgEmulatorWindow, times: int):
+def run_k28(bot: TemplateMatcher, emu: BgEmulatorWindow, times: int):
     for index in range(times):
-        log(f"--- K28 loop {index + 1}/{times} start ---")
+        current = index + 1
+        log(f"第 {current}/{times} 次困难28开始")
         if not enter_k28(bot):
             raise ScriptStuck("could not enter K28 map")
+        log("进入探索地图")
 
         boss_found = False
         step_start = time.time()
@@ -489,13 +524,14 @@ def run_k28(bot: MaaMatcher, emu: BgEmulatorWindow, times: int):
             boss = bot.find("boss")
             if boss:
                 bot.click_match(boss, wait=0.2)
+                log(f"第 {current}/{times} 次：开始 Boss 战斗")
                 boss_found = True
                 continue
 
             battle = bot.find("battle")
             if battle:
                 bot.click_match(battle, wait=0.2)
-                log("[k28] clicked battle")
+                log(f"第 {current}/{times} 次：开始小怪战斗")
                 step_start = time.time()
                 time.sleep(12)
                 end_found = False
@@ -506,6 +542,8 @@ def run_k28(bot: MaaMatcher, emu: BgEmulatorWindow, times: int):
                         break
                     time.sleep(1)
                     wait_count += 1
+                if end_found:
+                    log(f"第 {current}/{times} 次：结束小怪战斗")
                 re_search = 0 if end_found else re_search + 1
                 time.sleep(0.5)
                 continue
@@ -517,18 +555,19 @@ def run_k28(bot: MaaMatcher, emu: BgEmulatorWindow, times: int):
         time.sleep(12)
         if not wait_for_settlement_and_click(bot, timeout=120, wait=random.uniform(1.5, 2.5)):
             raise ScriptStuck("boss settlement not found")
+        log(f"第 {current}/{times} 次：结束 Boss 战斗")
         time.sleep(2)
 
         finish_k28_rewards(bot)
 
-        log(f"--- K28 loop {index + 1}/{times} complete ---")
+        log(f"第 {current}/{times} 次困难28完成")
 
 
 def main():
     os.chdir(SCRIPT_DIR)
-    log("Starting MAA-lite K28 script...")
+    log("困难28脚本启动")
     emu = BgEmulatorWindow()
-    bot = MaaMatcher(emu)
+    bot = TemplateMatcher(emu)
     if not bot.check_required_templates():
         return
 
@@ -544,7 +583,7 @@ def main():
         log(f"[WARN] script stuck: {exc}")
         ctypes.windll.user32.MessageBoxW(None, "脚本卡死，请人工介入", "YYS Bot", 0x30)
 
-    log("K28 task finished.")
+    log("困难28任务结束")
 
 
 if __name__ == "__main__":

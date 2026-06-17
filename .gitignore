@@ -36,13 +36,13 @@ find_title.py
 test.py
 test_screen.py
 
-# Keep only the current adaptive templates under images/maa
+# Keep only the current adaptive templates
 images/*
-!images/maa/
-!images/maa/**
+!images/templates/
+!images/templates/**
 
 # Reference repo cloned for research, not part of this project
-MaaAssistantArknights/
+_reference_arknights/
 
 # Local screenshots/debug output
 _capture_*.png

@@ -41,10 +41,10 @@
 
 ### 自适应模板截图
 
-自适应脚本使用 `images/maa` 里的模板。需要重新截图时，把模拟器停在对应界面，然后运行：
+自适应脚本使用 `images/templates` 里的模板。需要重新截图时，把模拟器停在对应界面，然后运行：
 
 ```powershell
-.\.venv\Scripts\python.exe .\capture_maa_template.py 模板名
+.\.venv\Scripts\python.exe .\capture_template.py 模板名
 ```
 
 常用模板名：
@@ -52,4 +52,4 @@
 - 挑战脚本：`challenge`、`settlement`
 - K28 脚本：`k28_stage`、`k28_explore`、`k28_battle`、`k28_boss`、`k28_paper`、`k28_treasure`、`k28_team_prompt`、`k28_team_confirm`
 
-截图工具会把模板保存到 `images/maa`。
+截图工具会把模板保存到 `images/templates`。

@@ -15,12 +15,12 @@ import win32ui
 ctypes.windll.user32.SetProcessDPIAware()
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-TEMPLATE_DIR = os.path.join(SCRIPT_DIR, "images", "maa")
+TEMPLATE_DIR = os.path.join(SCRIPT_DIR, "images", "templates")
 BASE_W = 1280
 BASE_H = 720
 
 
-def maa_scale_size(width: int, height: int) -> tuple:
+def normalize_screen_size(width: int, height: int) -> tuple:
     if width <= 0 or height <= 0:
         return BASE_W, BASE_H
     default_ratio = BASE_W / BASE_H
@@ -83,7 +83,7 @@ class BgEmulatorWindow:
     def screenshot_base(self):
         raw = self.screenshot_raw()
         raw_h, raw_w = raw.shape[:2]
-        base_w, base_h = maa_scale_size(raw_w, raw_h)
+        base_w, base_h = normalize_screen_size(raw_w, raw_h)
         if raw_w == base_w and raw_h == base_h:
             return raw
         interpolation = cv2.INTER_AREA if base_w <= raw_w and base_h <= raw_h else cv2.INTER_LINEAR
@@ -95,7 +95,7 @@ class CropWindow:
         self.image = image
         self.template_name = template_name
         self.root = tk.Tk()
-        self.root.title(f"截取 MAA 模板：{template_name}")
+        self.root.title(f"截取识别模板：{template_name}")
         self.root.configure(bg="#111111")
 
         screen_w = self.root.winfo_screenwidth()

@@ -70,7 +70,7 @@ namespace YysBotLauncher
 
             k28Button = CreateButton("困难28");
             k28Button.Text = "困难28";
-            k28Button.Click += delegate { StartScript("maa_lite_k28.py"); };
+            k28Button.Click += delegate { StartScript("adaptive_k28.py"); };
             Controls.Add(k28Button);
 
             shuaButton = CreateButton("挑战");
@@ -84,7 +84,7 @@ namespace YysBotLauncher
             Controls.Add(ignoreSizeButton);
 
             captureButton = CreateButton("自适应K28");
-            captureButton.Click += delegate { StartScript("maa_lite_k28.py"); };
+            captureButton.Click += delegate { StartScript("adaptive_k28.py"); };
             captureButton.Visible = false;
             Controls.Add(captureButton);
 
@@ -105,7 +105,7 @@ namespace YysBotLauncher
             noteBox.ForeColor = Color.FromArgb(255, 248, 232);
             noteBox.Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold, GraphicsUnit.Point);
             noteBox.TitleFont = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold, GraphicsUnit.Point);
-            noteBox.Text = "1. 配环境：首次使用先运行 setup_env.ps1。看到 Environment ready 后，再打开 script.exe。\n\n2. 自适应脚本模板用 capture_maa_template.py 截图，保存到 images/maa。\n\n3. 先填写好运行次数，再点击按钮运行。";
+            noteBox.Text = "1. 配环境：首次使用先运行 setup_env.ps1。看到 Environment ready 后，再打开 script.exe。\n\n2. 自适应脚本模板用 capture_template.py 截图，保存到 images/templates。\n\n3. 先填写好运行次数，再点击按钮运行。";
             Controls.Add(noteBox);
 
             LayoutContentPanels();
