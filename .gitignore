@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local/editor files
+.vscode/
+.idea/
+.codex/
+.agents/
+*.log
+*.tmp
+*.bak
+
+# Build/cache output
+bin/
+obj/
+dist/
+build/
+script_preview.exe
+
+# Legacy scripts and local test helpers not used by the current launcher
+bot.py
+k28.py
+shua.py
+capture_1010.py
+find_title.py
+test.py
+test_screen.py
+
+# Keep only the current adaptive templates under images/maa
+images/*
+!images/maa/
+!images/maa/**
+
+# Reference repo cloned for research, not part of this project
+MaaAssistantArknights/
+
+# Local screenshots/debug output
+_capture_*.png
+*_debug.png
+debug_*.png

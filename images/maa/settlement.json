@@ -1,0 +1,13 @@
+{
+  "template": "settlement.png",
+  "base_size": [
+    1280,
+    720
+  ],
+  "rect": [
+    541,
+    508,
+    190,
+    86
+  ]
+}
