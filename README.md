@@ -67,3 +67,6 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 - K28 脚本：`k28_stage`、`k28_explore`、`k28_battle`、`k28_boss`、`k28_paper`、`k28_treasure`、`k28_team_prompt`、`k28_team_confirm`
 
 截图工具会把模板保存到 `images/templates`。
+
+# 免责声明
+本脚本**无法保证绝对的安全与稳定**，使用本脚本导致封号**概不负责**。
