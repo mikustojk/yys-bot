@@ -21,6 +21,20 @@
 .\setup_env.ps1
 ```
 
+如果提示“因为在此系统上禁止运行脚本”，先在当前 PowerShell 窗口运行：
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+然后再运行：
+
+```powershell
+.\setup_env.ps1
+```
+
+这个设置只对当前 PowerShell 窗口生效，不会永久修改系统策略。
+
 看到 `Environment ready` 后，直接打开目录中的：
 
 ```powershell
